@@ -58,7 +58,8 @@ export function openPalette({ filesOnly = false, title, onPick } = {}) {
     res.innerHTML = groups.map(([g, list]) => `<div class="grp">${esc(g)}</div>${list.map(x => `<button class="mi ${i === hl ? 'hl' : ''}" data-i="${i++}">${x.dot ? `<span class="dot" style="--c:${x.dot}"></span>` : icon(x.icon || 'file')}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.label)}</span>${x.sub ? `<span class="sub">${esc(x.sub)}</span>` : ''}${x.k ? `<span class="k kbd">${esc(x.k)}</span>` : ''}</button>`).join('')}`).join('') || '<div class="empty" style="padding:24px">Nothing found.</div>';
     res.querySelector('.hl')?.scrollIntoView({ block: 'nearest' });
   };
-  const pick = i => { const x = items[i]; if (!x) return; m.close(); onPick ? onPick(x) : x.run(); };
+  // hand the choice over first, then close (closing without a choice means 'cancelled')
+  const pick = i => { const x = items[i]; if (!x) return; if (onPick) onPick(x); m.close(); if (!onPick) x.run(); };
   inp.addEventListener('input', () => { hl = 0; draw(); });
   inp.addEventListener('keydown', e => {
     if (e.key === 'ArrowDown') { e.preventDefault(); hl = Math.min(items.length - 1, hl + 1); draw(); }

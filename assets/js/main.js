@@ -124,7 +124,7 @@ export async function action(name, arg) {
     if (name === 'palette') return (await import('./palette.js')).openPalette();
     if (name === 'new-task') return (await import('./task.js')).newTaskModal({ status: arg?.status || 'todo' });
     if (name === 'new-idea') return (await import('./task.js')).newTaskModal({ status: 'idea' });
-    if (name === 'upload') return (await import('./upload.js')).uploadModal({ dir: arg?.dir });
+    if (name === 'upload') return (await import('./upload.js')).uploadModal({ dir: arg?.dir, task: arg?.task, replace: arg?.replace });
     if (name === 'help') return showHelp();
     if (name === 'theme') return setTheme(themeNow() === 'matrix' ? 'ink' : 'matrix');
   } catch (e) { toastErr(e); }
