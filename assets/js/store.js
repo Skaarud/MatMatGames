@@ -29,7 +29,8 @@ export const FILE_LABEL = 'hub: file';
 const META_RE = /\s*<!--\s*hub:(\{[\s\S]*?\})\s*-->\s*$/;
 
 export function splitMeta(body) {
-  body = body || '';
+  // GitHub stores line breaks as \r\n; normalise so checklists and edits work everywhere
+  body = (body || '').replace(/\r\n?/g, '\n');
   const m = body.match(META_RE);
   if (!m) return { text: body, meta: {} };
   let meta = {};
@@ -43,7 +44,7 @@ export function joinMeta(text, meta) {
 }
 export function parseChecklist(text) {
   const out = [];
-  (text || '').split('\n').forEach((line, i) => {
+  (text || '').replace(/\r\n?/g, '\n').split('\n').forEach((line, i) => {
     const m = line.match(/^\s*[-*]\s+\[( |x|X)\]\s+(.*)$/);
     if (m) out.push({ line: i, done: m[1] !== ' ', text: m[2] });
   });
@@ -247,7 +248,7 @@ class Store extends Emitter {
     const { text, meta } = splitMeta(fresh.body);
     const r = fn({ text, meta: { ...meta } }) || {};
     const body = joinMeta(r.text ?? text, r.meta ?? meta);
-    if (body === fresh.body) return this._put(fresh);
+    if (body === (fresh.body || '').replace(/\r\n?/g, '\n')) return this._put(fresh);
     const prev = this.issues.get(+n);
     this._put({ ...fresh, body });
     try {

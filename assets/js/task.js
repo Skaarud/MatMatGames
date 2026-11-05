@@ -167,7 +167,16 @@ export function openTask(n, onClose) {
   });
 
   draw();
-  const off = S.on('issue:' + n, () => { if (!d.contains(document.activeElement) || !document.activeElement.matches('[data-title], textarea, input')) draw(); });
+  // Redraw on changes, but never while someone is typing a title or a long text; catch up when they leave it.
+  let pending = false;
+  const busyTyping = () => d.contains(document.activeElement) && document.activeElement.matches('[data-title], textarea');
+  const off = S.on('issue:' + n, () => {
+    if (busyTyping()) { pending = true; return; }
+    const refocus = document.activeElement?.matches?.('[data-addcheck]');
+    draw();
+    if (refocus) body.querySelector('[data-addcheck]')?.focus();
+  });
+  d.addEventListener('focusout', () => setTimeout(() => { if (pending && !busyTyping()) { pending = false; draw(); } }, 0));
   const offTree = S.on('tree', draw);
   return () => { off(); offTree(); thread?.destroy(); root.innerHTML = ''; };
 }
