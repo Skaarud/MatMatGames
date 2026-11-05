@@ -59,7 +59,7 @@ export async function render(main, route) {
   const $ = s => page.querySelector(s);
   const listEl = $('[data-list]'), stripEl = $('[data-strip]'), topEl = $('[data-top]'), canvas = $('[data-canvas]'), shelf = $('[data-shelf]');
 
-  let viewer = null, ctl = null, loadToken = 0, stats = null;
+  let viewer = null, ctl = null, loadToken = 0, stats = null, dead = false, making = null;
   const cleanups = [];
 
   /* ---------- library ---------- */
@@ -152,22 +152,25 @@ export async function render(main, route) {
     veil.innerHTML = `<div class="box"><span class="spin" style="position:static;width:22px;height:22px"></span><div>${esc(m.name)} · ${bytes(m.size)}</div></div>`;
     try {
       const buf = await getBlob(m.sha);
-      if (token !== loadToken) return;
-      if (!viewer) {
+      if (token !== loadToken || dead) return;
+      // create the viewer exactly once, even if two models are clicked while it's starting
+      making ??= (async () => {
         const { ModelViewer } = await import('./viewer.js');
+        const { mountControls } = await import('./controls.js');
+        if (dead) return;
         canvas.querySelector('.empty')?.remove();
         viewer = new ModelViewer(canvas);
         const saved = ls.get('viewerPrefs', {});
         if (saved.light) viewer.setLight(saved.light);
         if (saved.bg) viewer.setBackground(saved.bg);
-        await viewer.load(buf, m.path, { resolve: rel => S.tree.entries.get(dirName(m.path) + '/' + rel) ? getBlob(S.tree.entries.get(dirName(m.path) + '/' + rel).sha) : Promise.reject() });
-        const { mountControls } = await import('./controls.js');
         ctl = mountControls(canvas, { viewer, fullscreenEl: page.querySelector('.mstage'), name: () => baseName(current), extraKeys: navKeys });
-        cleanups.push(() => { ls.set('viewerPrefs', { light: viewer.light, bg: viewer.bg }); ctl.destroy(); viewer.dispose(); });
-      } else {
-        await viewer.load(buf, m.path, { resolve: rel => S.tree.entries.get(dirName(m.path) + '/' + rel) ? getBlob(S.tree.entries.get(dirName(m.path) + '/' + rel).sha) : Promise.reject() });
-        ctl.refreshAnim();
-      }
+      })();
+      await making;
+      if (token !== loadToken || dead) return;
+      const resolve = rel => { const e = S.tree.entries.get(dirName(m.path) + '/' + rel); return e ? getBlob(e.sha) : Promise.reject(new Error('missing ' + rel)); };
+      await viewer.load(buf, m.path, { resolve });
+      if (dead) return;
+      ctl.refreshAnim();
       if (token !== loadToken) return;
       stats = viewer.stats();
       veil.remove();
@@ -239,6 +242,12 @@ export async function render(main, route) {
     S.on('tree', () => { const prevSha = models.find(m => m.path === current)?.sha; refresh(); const now = models.find(m => m.path === current); if (now && prevSha && now.sha !== prevSha) open(current); }),
     S.on('issues', () => { drawList(); const m = models.find(x => x.path === current); if (m) drawTop(m); }),
   ];
-  return () => { offs.forEach(f => f()); cleanups.forEach(f => { try { f(); } catch {} }); main.style.overflow = ''; };
+  return () => {
+    dead = true;
+    offs.forEach(f => f()); cleanups.forEach(f => { try { f(); } catch {} });
+    // the viewer may still be starting up; free it whenever it's ready
+    Promise.resolve(making).then(() => { if (viewer) { ls.set('viewerPrefs', { light: viewer.light, bg: viewer.bg }); ctl?.destroy(); viewer.dispose(); viewer = null; } });
+    main.style.overflow = '';
+  };
 }
 void avatarImg;

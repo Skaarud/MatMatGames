@@ -56,7 +56,17 @@ export async function render(main, route) {
         if (v === 'gh') open(`${S.webRepo}/blob/${S.cfg.branch}/${path.split('/').map(encodeURIComponent).join('/')}`, '_blank');
         if (v === 'move') {
           const to = await promptBox('Rename or move', { value: path, ok: 'Move' });
-          if (to && to.trim() !== path) { await commitFiles([{ path: to.trim(), from: path }], `Move ${baseName(path)} to ${to.trim()} (hub)`).catch(toastErr); location.hash = '#/file/' + encodeURIComponent(to.trim()); }
+          const dest = to?.trim().replace(/^\/+/, '');
+          if (dest && dest !== path) {
+            try {
+              await commitFiles([{ path: dest, from: path }], `Move ${baseName(path)} to ${dest} (hub)`);
+              // keep the comment thread and every task link pointing at the file
+              const th = S.fileThread(path);
+              if (th) { await S.patchBody(th.n, ({ meta }) => ({ meta: { ...meta, file: dest } })); await S.updateTask(th.n, { title: `💬 ${baseName(dest)}` }); }
+              for (const t of S.tasksForFile(path)) await S.patchBody(t.n, ({ meta }) => ({ meta: { ...meta, files: (meta.files || []).map(f => f === path ? dest : f) } }));
+              location.hash = '#/file/' + encodeURIComponent(dest);
+            } catch (er) { toastErr(er); }
+          }
         }
         if (v === 'del' && await confirmBox('Delete file?', `${path} will be removed from the repo. It stays in the git history, so it can be recovered.`, { ok: 'Delete', danger: true })) {
           await commitFiles([{ path, delete: true }], `Delete ${baseName(path)} (hub)`).catch(toastErr);
@@ -112,13 +122,13 @@ export async function render(main, route) {
   const bar = loading.querySelector('.progress i');
   let buf;
   try { buf = (await getFile(path)).buf; bar.style.width = '70%'; }
-  catch (e) { loading.innerHTML = `<div class="box">${esc(e.message)}</div>`; return () => { main.style.overflow = ''; }; }
+  catch (e) { loading.innerHTML = `<div class="box">${esc(e.message)}</div>`; return () => { cleanups.forEach(f => { try { f(); } catch {} }); main.style.overflow = ''; }; }
 
   const pinLayer = el('<div class="pins"></div>');
   if (kind === 'model') await mountModel();
-  else if (kind === 'image') mountImage();
+  else if (kind === 'image') await mountImage();
   else if (kind === 'audio') mountAudio();
-  else if (kind === 'video') { paneA.innerHTML = ''; const v = el(`<video controls style="width:100%;height:100%;background:#000"></video>`); v.src = URL.createObjectURL(new Blob([buf], { type: mimeOf(path) })); paneA.appendChild(v); }
+  else if (kind === 'video') { paneA.innerHTML = ''; const v = el(`<video controls style="width:100%;height:100%;background:#000"></video>`); v.src = URL.createObjectURL(new Blob([buf], { type: mimeOf(path) })); paneA.appendChild(v); cleanups.push(() => { v.pause(); URL.revokeObjectURL(v.src); }); }
   else if (kind === 'text') await mountText();
   else paneA.innerHTML = `<div class="empty" style="height:100%">${icon('file')}<div>No preview for .${esc(ext(path))} files. Download it to open it.</div></div>`;
   loading.remove();
@@ -129,7 +139,7 @@ export async function render(main, route) {
     const { ModelViewer } = await import('./viewer.js');
     viewer = new ModelViewer(paneA);
     try { await viewer.load(buf, path, { resolve: rel => getFile(dirName(path) + '/' + rel).then(r => r.buf) }); }
-    catch (e) { paneA.innerHTML = `<div class="empty" style="height:100%">${icon('cube')}<div>Could not read this model: ${esc(e.message)}</div></div>`; return; }
+    catch (e) { viewer.dispose(); viewer = null; paneA.innerHTML = `<div class="empty" style="height:100%">${icon('cube')}<div>Could not read this model: ${esc(e.message)}</div></div>`; return; }
     paneA.appendChild(pinLayer);
     const { mountControls } = await import('./controls.js');
     ctl = mountControls(paneA, { viewer, others: () => viewerB ? [viewerB] : [], pin: () => setPinMode(!pinMode), fullscreenEl: page.querySelector('.fv-stage'), name: () => baseName(path) });
@@ -187,8 +197,9 @@ export async function render(main, route) {
   }
 
   /* ---------- image ---------- */
-  function mountImage() {
-    const url = URL.createObjectURL(new Blob([buf], { type: mimeOf(path) }));
+  async function mountImage() {
+    const { imageUrl } = await import('./files.js');
+    const url = await imageUrl(buf, path);
     const stage = el(`<div class="img-stage"><div class="layer"><img alt="" draggable="false"></div></div>`);
     const layer = stage.querySelector('.layer'), img = layer.querySelector('img');
     layer.appendChild(pinLayer);
@@ -215,9 +226,32 @@ export async function render(main, route) {
       x = mx - (mx - x) * ns / s; y = my - (my - y) * ns / s; s = ns; apply();
     }, { passive: false });
     let drag = null;
-    stage.addEventListener('pointerdown', e => { if (e.target.closest('.pin, .wipe')) return; drag = { x: e.clientX, y: e.clientY, ox: x, oy: y, moved: false }; stage.setPointerCapture(e.pointerId); stage.classList.add('grabbing'); });
-    stage.addEventListener('pointermove', e => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 3) drag.moved = true; x = drag.ox + dx; y = drag.oy + dy; apply(); });
+    const fingers = new Map(); let pinch = null;
+    stage.addEventListener('pointerdown', e => {
+      if (e.target.closest('.pin, .wipe')) return;
+      fingers.set(e.pointerId, [e.clientX, e.clientY]);
+      stage.setPointerCapture(e.pointerId);
+      if (fingers.size === 2) {
+        const [a, b] = [...fingers.values()], r = stage.getBoundingClientRect();
+        pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), s, x, y, mx: (a[0] + b[0]) / 2 - r.left, my: (a[1] + b[1]) / 2 - r.top };
+        drag = null; return;
+      }
+      drag = { x: e.clientX, y: e.clientY, ox: x, oy: y, moved: false }; stage.classList.add('grabbing');
+    });
+    stage.addEventListener('pointermove', e => {
+      if (fingers.has(e.pointerId)) fingers.set(e.pointerId, [e.clientX, e.clientY]);
+      if (pinch && fingers.size === 2) {
+        const [a, b] = [...fingers.values()];
+        const ns = Math.min(40, Math.max(.05, pinch.s * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d));
+        x = pinch.mx - (pinch.mx - pinch.x) * ns / pinch.s; y = pinch.my - (pinch.my - pinch.y) * ns / pinch.s; s = ns; apply();
+        return;
+      }
+      if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.hypot(dx, dy) > 3) drag.moved = true; x = drag.ox + dx; y = drag.oy + dy; apply();
+    });
+    const lift = e => { fingers.delete(e.pointerId); if (fingers.size < 2) pinch = null; };
+    stage.addEventListener('pointercancel', lift);
     stage.addEventListener('pointerup', e => {
+      const wasPinch = !!pinch || fingers.size > 1; lift(e); if (wasPinch) { drag = null; return; }
       stage.classList.remove('grabbing');
       const d = drag; drag = null;
       if (!d || d.moved || !pinMode) return;
@@ -250,8 +284,10 @@ export async function render(main, route) {
         if (cmpUrl) URL.revokeObjectURL(cmpUrl); cmpUrl = null;
         if (!sha) return apply();
         const { getBlob } = await import('./files.js');
-        cmpUrl = URL.createObjectURL(new Blob([await getBlob(sha)], { type: mimeOf(path) }));
-        const old = el(`<img data-old alt="" draggable="false" style="position:absolute;left:0;top:0;width:${W}px;height:${H}px">`); old.src = cmpUrl;
+        const { imageUrl } = await import('./files.js');
+        cmpUrl = await imageUrl(await getBlob(sha), path);
+        const old = el(`<img data-old alt="" draggable="false" style="position:absolute;left:0;top:0;width:${W}px;height:${H}px;object-fit:contain;background:var(--viewer-bg)">`); old.src = cmpUrl;
+        old.onload = () => { if (old.naturalWidth !== W || old.naturalHeight !== H) toast(`Old version was ${old.naturalWidth}×${old.naturalHeight}, now ${W}×${H}`, { ms: 4000 }); };
         layer.insertBefore(old, pinLayer);
         const w = el('<div class="wipe"></div>'); stage.appendChild(w);
         paneA.appendChild(el(`<div class="pane-label">◀ ${esc(label)} · current ▶</div>`));

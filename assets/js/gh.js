@@ -54,13 +54,19 @@ export class GH {
       if (res.status === 403 && this.rate.remaining === 0) msg = 'GitHub rate limit reached. It resets ' + new Date(this.rate.reset).toLocaleTimeString() + '.';
       if (res.status === 404) msg = 'Not found (404): ' + path.replace(this.base, '') + '. Check that your token can see this repo.';
       if (data?.errors?.length) msg += ' — ' + data.errors.map(e => e.message || e.code).join(', ');
-      throw new GHError(res.status, msg, data);
+      const err = new GHError(res.status, msg, data);
+      err.retryAfter = +res.headers.get('retry-after') || 0;
+      throw err;
     }
     if (raw) return { data: await res.arrayBuffer(), res };
     if (res.status === 204) return { data: null, res };
     const data = await res.json();
     const tag = res.headers.get('etag');
-    if (etag && tag) this.etags.set(url + '|' + h.Accept, { etag: tag, data });
+    if (etag && tag) {
+      const k = url + '|' + h.Accept;
+      this.etags.delete(k); this.etags.set(k, { etag: tag, data });
+      while (this.etags.size > 300) this.etags.delete(this.etags.keys().next().value);
+    }
     return { data, res };
   }
 

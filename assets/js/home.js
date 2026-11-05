@@ -13,7 +13,8 @@ export function render(main) {
     const me = S.me.login;
     const ts = S.tasks();
     const open = ts.filter(t => !['done', 'parked'].includes(t.status));
-    const toReview = ts.filter(t => t.status === 'review' && !t.assignees.includes(me) && (t.author !== me || t.assignees.length));
+    // in review and not only my own work (if we both worked on it, either of us can review)
+    const toReview = ts.filter(t => t.status === 'review' && !(t.assignees.length ? t.assignees.every(a => a === me) : t.author === me));
     const mine = open.filter(t => t.assignees.includes(me) && t.status !== 'idea').sort((a, b) => (a.due || '9') .localeCompare(b.due || '9') || a.prioRank - b.prioRank);
     const ideasToVote = ts.filter(t => t.status === 'idea' && t.author !== me && !votedByMe(t));
     const unclaimed = open.filter(t => t.status === 'todo' && !t.assignees.length).sort((a, b) => a.prioRank - b.prioRank).slice(0, 5);

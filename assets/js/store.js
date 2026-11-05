@@ -105,7 +105,12 @@ class Store extends Emitter {
     gh.onActivity(n => this._setSync(n > 0 ? 'busy' : (this.syncState === 'err' ? 'err' : 'ok')));
     return me;
   }
-  logout() { ls.del('token'); this.stop(); location.hash = ''; location.reload(); }
+  async logout() {
+    ls.del('token'); this.stop();
+    // private models and images stay cached in the browser otherwise
+    try { await caches.delete('mmg-blobs-v1'); } catch {}
+    location.hash = ''; location.reload();
+  }
 
   _setSync(s) { if (s !== this.syncState) { this.syncState = s; this.emit('sync', s); } }
 
@@ -121,36 +126,57 @@ class Store extends Emitter {
     const results = await Promise.allSettled(jobs);
     results.forEach(r => r.status === 'rejected' && console.warn(r.reason));
     if (results[0].status === 'rejected') throw results[0].reason;
-    this.ensureLabels().catch(e => console.warn('labels', e));
+    await this.ensureLabels().catch(e => console.warn('labels', e));
     this.ready = true;
     this.lastSync = new Date();
+    this._syncedFrom = Date.now() - 60000;
     this.emit('ready');
     this.start();
   }
 
   start() {
     this.stop();
+    let running = false;
+    // one loop only: a tick that is already running is never started twice
     const tick = async () => {
-      const visible = document.visibilityState === 'visible';
+      clearTimeout(this._timer);
+      if (running) return;
+      running = true;
+      let delay = document.visibilityState === 'visible' ? 15000 : 60000;
       try { await this.sync(); this._setSync('ok'); }
-      catch (e) { console.warn('sync', e); this._setSync('err'); }
-      this._timer = setTimeout(tick, visible ? 15000 : 60000);
+      catch (e) {
+        console.warn('sync', e); this._setSync('err');
+        // back off when GitHub says slow down
+        if (e.status === 403 || e.status === 429) delay = Math.max(60000, (this.gh.rate.reset || 0) - Date.now() + 2000, (e.retryAfter || 0) * 1000);
+      }
+      running = false;
+      this._timer = setTimeout(tick, delay);
     };
+    this._tick = tick;
     this._timer = setTimeout(tick, 15000);
-    this._vis = () => { if (document.visibilityState === 'visible') { clearTimeout(this._timer); tick(); } };
+    this._vis = () => { if (document.visibilityState === 'visible') tick(); };
     document.addEventListener('visibilitychange', this._vis);
   }
   stop() { clearTimeout(this._timer); if (this._vis) document.removeEventListener('visibilitychange', this._vis); }
 
+  /** A 'since' that stays the same for 5 minutes (so GitHub can answer 304, which is free)
+      and always reaches back before the last successful sync (so a sleeping laptop misses nothing). */
+  sinceBucket() {
+    const from = Math.min(this._syncedFrom || Date.now(), Date.now()) - 2 * 60000;
+    const B = 5 * 60000;
+    return new Date(Math.floor(from / B) * B).toISOString();
+  }
   async sync() {
-    // overlap a little with the last successful sync, so a sleeping laptop never misses anything
-    const since = new Date(Math.min(Date.now() - 10 * 60 * 1000, (this.lastSync?.getTime() || Date.now()) - 2 * 60 * 1000)).toISOString();
+    const started = Date.now();
+    const since = this.sinceBucket();
     await Promise.all([
       this.loadIssues(false, since),
-      this.loadRecent(false),
+      this.loadRecent(false, since),
       this.loadEvents(),
       this.checkHead(),
+      this.refreshVotes(),
     ]);
+    this._syncedFrom = started;
     this.lastSync = new Date();
     this.emit('synced');
   }
@@ -160,7 +186,7 @@ class Store extends Emitter {
     const accept = 'application/vnd.github.full+json';
     let list;
     if (full) list = await this.gh.all(`${this.repoPath}/issues?state=all&sort=updated&direction=desc`, { accept });
-    else list = await this.gh.get(`${this.repoPath}/issues?state=all&sort=updated&direction=desc&per_page=100&since=${since}`, { accept });
+    else list = await this.gh.all(`${this.repoPath}/issues?state=all&sort=updated&direction=desc&since=${since}`, { accept, max: 5 });
     const changed = [];
     for (const it of list) {
       if (it.pull_request) continue;
@@ -236,10 +262,13 @@ class Store extends Emitter {
     if (patch.labels) opt.labels = patch.labels.map(name => ({ name }));
     if (patch.assignees) opt.assignees = patch.assignees.map(l => this.people.get(l) || { login: l });
     this._put(opt);
+    let issue;
     try {
-      const issue = await this.gh.patch(`${this.repoPath}/issues/${n}`, patch, { accept: 'application/vnd.github.full+json' });
-      return this._put(issue);
+      issue = this._put(await this.gh.patch(`${this.repoPath}/issues/${n}`, patch, { accept: 'application/vnd.github.full+json' }));
     } catch (e) { this._put(prev); throw e; }
+    // remember where a parked card came from, so un-parking puts it back there
+    if (status === 'parked' && cur.status !== 'parked') issue = await this.setMeta(n, { parkedFrom: cur.status }).catch(() => issue);
+    return issue;
   }
 
   /** Read-modify-write on the body with a fresh copy so we never clobber the other person's edit. */
@@ -266,10 +295,11 @@ class Store extends Emitter {
     const prev = this.issues.get(+n);
     const { text, meta } = splitMeta(prev.body);
     this.issues.set(+n, { ...prev, body: joinMeta(text, { ...meta, order }) });
-    if (status !== cur.status) jobs.push(this.updateTask(n, { status }));
+    void jobs;
+    // one after the other: running them together let the body save paint the card back into the old column
+    if (status !== cur.status) await this.updateTask(n, { status });
     else this.emit('issues', [+n]);
-    jobs.push(this.setMeta(n, { order }));
-    await Promise.all(jobs);
+    await this.setMeta(n, { order });
   }
 
   async ensureLabels() {
@@ -294,9 +324,9 @@ class Store extends Emitter {
     if (force || sig(prev) !== sig(list)) this.emit('comments:' + n, list);
     return list;
   }
-  async loadRecent(first) {
-    const since = new Date(first ? Date.now() - 30 * 86400000 : Math.min(Date.now() - 86400000, (this.lastSync?.getTime() || Date.now()) - 120000)).toISOString();
-    const list = await this.gh.all(`${this.repoPath}/issues/comments?sort=updated&direction=desc&since=${since}`, { accept: 'application/vnd.github.full+json', max: first ? 5 : 1 });
+  async loadRecent(first, since) {
+    since = first ? new Date(Date.now() - 30 * 86400000).toISOString() : since;
+    const list = await this.gh.all(`${this.repoPath}/issues/comments?sort=updated&direction=desc&since=${since}`, { accept: 'application/vnd.github.full+json', max: first ? 5 : 3 });
     const touched = new Set();
     for (const c of list) {
       const p = this.recent.get(c.id);
@@ -354,21 +384,38 @@ class Store extends Emitter {
     return this.gh.get(`${this.repoPath}/issues/${n}/reactions?per_page=100`);
   }
   /** Who voted 👍/👎 on which ideas. Cached; re-fetched only when an issue's reaction totals change. */
-  async loadVotes(ns) {
+  async loadVotes(ns, { force = false } = {}) {
     this.votes ??= new Map();
+    let changed = false;
     const jobs = ns.filter(n => {
       const i = this.issues.get(n); const sig = JSON.stringify(i?.reactions || {});
-      return this.votes.get(n)?.sig !== sig;
+      return force || this.votes.get(n)?.sig !== sig;
     }).map(async n => {
-      const i = this.issues.get(n); const sig = JSON.stringify(i?.reactions || {});
       try {
-        const list = await this.reactions(n);
+        const { data: list, notModified } = await this.gh.req('GET', `${this.repoPath}/issues/${n}/reactions?per_page=100`);
+        if (notModified && this.votes.has(n)) return;
         const up = list.filter(r => r.content === '+1').map(r => r.user.login);
         const down = list.filter(r => r.content === '-1').map(r => r.user.login);
+        const i = this.issues.get(n);
+        // GitHub doesn't bump updated_at for reactions, so keep the card's counts in step ourselves
+        if (i) {
+          const r = { ...(i.reactions || {}) }; r['+1'] = up.length; r['-1'] = down.length;
+          if (r['+1'] !== i.reactions?.['+1'] || r['-1'] !== i.reactions?.['-1']) { this.issues.set(n, { ...i, reactions: r }); changed = true; }
+        }
+        const sig = JSON.stringify(this.issues.get(n)?.reactions || {});
+        const prev = this.votes.get(n);
+        if (!prev || prev.up.join() !== up.join() || prev.down.join() !== down.join()) changed = true;
         this.votes.set(n, { sig, up, down, mine: up.includes(this.me.login) ? 'up' : down.includes(this.me.login) ? 'down' : null });
       } catch {}
     });
-    if (jobs.length) { await Promise.all(jobs); this.emit('votes'); }
+    await Promise.all(jobs);
+    if (changed) { this.emit('votes'); this.emit('issues', []); }
+  }
+  /** Re-check votes on open ideas while someone is looking at them (Home or Ideas). */
+  async refreshVotes() {
+    if (!/^#\/(home|ideas)?$/.test(location.hash.split('?')[0]) && location.hash) return;
+    const ns = this.tasks().filter(t => t.status === 'idea').map(t => t.n);
+    if (ns.length) await this.loadVotes(ns, { force: true });
   }
 
   /** Get (or create) the comment thread for a file. */

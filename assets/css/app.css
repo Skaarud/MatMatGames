@@ -359,6 +359,9 @@ label.field { display: grid; gap: 6px; font-size: 12px; color: var(--fg2); }
 .tile.folder .thumb { aspect-ratio: 1.6; }
 .tile.folder .thumb svg { width: 34%; height: 50%; opacity: .55; color: var(--accent); }
 .tile.sel { outline: 2px solid var(--accent); }
+.tile .unlink { position: absolute; top: 6px; right: 6px; z-index: 2; opacity: 0; background: var(--bg2); }
+.tile:hover .unlink { opacity: 1; }
+@media (hover: none) { .tile .unlink { opacity: .85; } }
 .drop-veil { position: fixed; inset: 0; z-index: 90; background: color-mix(in srgb, var(--bg) 70%, transparent); display: grid; place-items: center; pointer-events: none; animation: fade .12s; }
 .drop-veil div { padding: 40px 60px; border: 3px dashed var(--accent); border-radius: var(--radius-lg); font: 800 22px var(--font-head); color: var(--accent); background: var(--bg2); }
 
@@ -517,8 +520,11 @@ html[data-theme="matrix"] .mtitle { color: var(--accent); text-shadow: 0 0 10px 
 
 /* mobile */
 .mnav { display: none; }
+.mtop { display: none; }
 @media (max-width: 900px) {
-  .shell { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
+  .shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .mtop { display: flex; align-items: center; gap: 2px; padding: calc(6px + env(safe-area-inset-top)) 8px 6px 12px; background: var(--bg-glass); border-bottom: 1px solid var(--line); backdrop-filter: blur(10px); }
+  .mtop .brand-mark { width: 26px; height: 26px; margin-right: 6px; }
   .side { display: none; }
   .mnav { display: flex; justify-content: space-around; background: var(--bg-glass); border-top: 1px solid var(--line); padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); backdrop-filter: blur(10px); }
   .mnav a { display: grid; place-items: center; gap: 2px; font-size: 10px; color: var(--fg2); padding: 4px 8px; position: relative; }

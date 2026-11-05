@@ -87,6 +87,11 @@ function shell() {
         <div class="sync" title="Live sync with GitHub"><span class="dot"></span><span data-sync>Live</span></div>
       </div>
     </aside>
+    <header class="mtop">${brandMark()}<b class="brand-name" style="font-size:15px;flex:1">MatMat Games</b>
+      <button class="btn ghost icon" data-act="palette" title="Search">${icon('search')}</button>
+      <button class="btn ghost icon" data-act="mobile-new" title="New">${icon('plus')}</button>
+      <button class="btn ghost icon" data-act="theme" title="Matrix / Ink">${icon('sun')}</button>
+      <a class="btn ghost icon" href="#/settings" title="Settings">${icon('gear')}</a></header>
     <main class="main" id="main"></main>
     <nav class="mnav">${NAV.map(n => `<a href="#/${n.r}" data-r="${n.r}">${icon(n.icon)}<span>${n.label}</span>${n.r === 'inbox' ? '<span class="count hidden" data-count="inbox-m"></span>' : ''}</a>`).join('')}</nav>
   </div>`);
@@ -94,7 +99,7 @@ function shell() {
   s.querySelectorAll('.theme-switch button').forEach(b => { b.classList.toggle('on', b.dataset.t === themeNow()); b.onclick = () => setTheme(b.dataset.t); });
   s.addEventListener('click', e => {
     const a = e.target.closest('[data-act]'); if (!a) return;
-    e.preventDefault(); action(a.dataset.act);
+    e.preventDefault(); action(a.dataset.act, a.dataset.act === 'mobile-new' ? a : undefined);
   });
   const syncEl = s.querySelector('.sync'), syncTxt = s.querySelector('[data-sync]');
   const upd = st => {
@@ -128,6 +133,12 @@ export async function action(name, arg) {
     if (name === 'upload') return (await import('./upload.js')).uploadModal({ dir: arg?.dir, task: arg?.task, replace: arg?.replace });
     if (name === 'help') return showHelp();
     if (name === 'theme') return setTheme(themeNow() === 'matrix' ? 'ink' : 'matrix');
+    if (name === 'mobile-new') {
+      const { menu } = await import('./ui.js');
+      return menu(arg || document.querySelector('.mtop [data-act="mobile-new"]'), [
+        { label: 'New task', value: 'new-task', icon: 'plus' }, { label: 'New idea', value: 'new-idea', icon: 'sparkle' }, { label: 'Upload files', value: 'upload', icon: 'upload' },
+      ], v => action(v));
+    }
   } catch (e) { toastErr(e); }
 }
 
@@ -186,7 +197,9 @@ async function show(r) {
   try {
     const mod = await loader();
     if (current.key !== key) return;
-    current.cleanup = await mod.render(main, r) || null;
+    const cleanup = await mod.render(main, r) || null;
+    if (current.key !== key) { try { cleanup?.(); } catch {} return; }  // user already left this page
+    current.cleanup = cleanup;
   } catch (e) { toastErr(e, 'Could not open this page'); main.innerHTML = `<div class="page"><div class="empty">${icon('info')}<div>${esc(e.message)}</div></div></div>`; }
 }
 

@@ -4,9 +4,10 @@ import { b64FromBuffer } from './gh.js';
 
 export const KINDS = {
   model: ['glb', 'gltf', 'fbx', 'obj'],
-  image: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp', 'avif'],
+  image: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg', 'bmp', 'avif', 'tga'],
   audio: ['wav', 'ogg', 'mp3', 'flac', 'm4a'],
   video: ['mp4', 'webm', 'mov'],
+  source: ['psd', 'tif', 'tiff', 'exr', 'hdr', 'blend', 'kra', 'xcf', 'spp', 'sbs', 'sbsar', 'ztl', 'zpr', 'max', 'ma', 'mb', 'aseprite', 'ase', 'dds'],
   text: ['md', 'txt', 'json', 'py', 'sh', 'cpp', 'h', 'cs', 'gd', 'ini', 'cfg', 'yml', 'yaml', 'csv', 'js', 'css', 'html', 'xml', 'uproject', 'tscn'],
 };
 const EXT2KIND = {};
@@ -15,7 +16,7 @@ export const ext = p => (p.split('/').pop().match(/\.([^.]+)$/)?.[1] || '').toLo
 export const kindOf = p => EXT2KIND[ext(p)] || 'other';
 export const baseName = p => p.split('/').pop();
 export const dirName = p => p.split('/').slice(0, -1).join('/');
-export const KIND_ICON = { model: 'cube', image: 'image', audio: 'audio', video: 'video', text: 'doc', other: 'file' };
+export const KIND_ICON = { model: 'cube', image: 'image', audio: 'audio', video: 'video', text: 'doc', source: 'layers', other: 'file' };
 const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml', bmp: 'image/bmp', avif: 'image/avif', wav: 'audio/wav', ogg: 'audio/ogg', mp3: 'audio/mpeg', flac: 'audio/flac', m4a: 'audio/mp4', mp4: 'video/mp4', webm: 'video/webm', mov: 'video/quicktime', glb: 'model/gltf-binary', gltf: 'model/gltf+json' };
 export const mimeOf = p => MIME[ext(p)] || 'application/octet-stream';
 
@@ -23,7 +24,15 @@ export const mimeOf = p => MIME[ext(p)] || 'application/octet-stream';
 export const HIDE_DIRS = ['.git', 'Binaries', 'Intermediate', 'Saved', 'DerivedDataCache', '.godot', 'node_modules'];
 
 /* ---------- blob cache (Cache Storage, keyed by git sha = immutable) ---------- */
-const mem = new Map();
+const mem = new Map(), memBytes = new Map();
+const MEM_BUDGET = 250 * 1024 * 1024;   // keep at most ~250 MB of files in RAM; the rest lives in the browser cache
+function trim() {
+  let total = [...memBytes.values()].reduce((a, b) => a + b, 0);
+  for (const k of mem.keys()) {
+    if (total <= MEM_BUDGET || mem.size <= 2) break;
+    total -= memBytes.get(k) || 0; mem.delete(k); memBytes.delete(k);
+  }
+}
 let cachePromise = null;
 const cache = () => (cachePromise ??= (self.caches ? caches.open('mmg-blobs-v1').catch(() => null) : Promise.resolve(null)));
 
@@ -40,9 +49,7 @@ export async function getBlob(sha, { onProgress } = {}) {
     return buf;
   })();
   mem.set(sha, p);
-  p.catch(() => mem.delete(sha));
-  // keep the in-memory map small
-  if (mem.size > 40) mem.delete(mem.keys().next().value);
+  p.then(b => { memBytes.set(sha, b.byteLength); trim(); }, () => mem.delete(sha));
   return p;
 }
 export async function getFile(path, ref) {
@@ -56,7 +63,20 @@ export async function getFile(path, ref) {
 }
 export async function blobUrl(path, ref) {
   const { buf } = await getFile(path, ref);
-  return URL.createObjectURL(new Blob([buf], { type: mimeOf(path) }));
+  return imageUrl(buf, path);
+}
+/** Object URL for showing an image; TGA (browsers can't show it) is decoded to PNG first. */
+export async function imageUrl(buf, path) {
+  if (ext(path) !== 'tga') return URL.createObjectURL(new Blob([buf], { type: mimeOf(path) }));
+  const { TGALoader } = await import('three/addons/loaders/TGALoader.js');
+  const t = new TGALoader().parse(buf);
+  const c = document.createElement('canvas'); c.width = t.width; c.height = t.height;
+  const g = c.getContext('2d'); const img = g.createImageData(t.width, t.height);
+  // TGA rows come bottom-up
+  for (let y = 0; y < t.height; y++) img.data.set(t.data.subarray((t.height - 1 - y) * t.width * 4, (t.height - y) * t.width * 4), y * t.width * 4);
+  g.putImageData(img, 0, 0);
+  const png = await new Promise(r => c.toBlob(r, 'image/png'));
+  return URL.createObjectURL(png);
 }
 export const encPath = p => p.split('/').map(encodeURIComponent).join('/');
 

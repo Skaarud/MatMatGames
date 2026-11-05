@@ -17,7 +17,7 @@ export function start() {
 export const list = () => notices;
 export const isUnread = n => +new Date(n.time) > readAt && !readIds.has(n.id);
 export const unreadCount = () => notices.filter(isUnread).length;
-export function markRead(id) { readIds.add(id); ls.set('readIds', [...readIds].slice(-600)); S.emit('inbox', unreadCount()); }
+export function markRead(id) { readIds.add(id); ls.set('readIds', [...readIds].slice(-3000)); S.emit('inbox', unreadCount()); }
 export function markAllRead() { readAt = Date.now(); readIds = new Set(); ls.set('readAt', readAt); ls.set('readIds', []); S.emit('inbox', 0); }
 
 export function targetHref(n) {

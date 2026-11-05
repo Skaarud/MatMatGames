@@ -59,7 +59,7 @@ export function mountControls(pane, { viewer, others = () => [], pin = null, ful
   const toggle = (k, btn) => {
     btn ??= pane.querySelector(`[data-t="${k}"]`);
     if (k === 'wire') { const v = viewer.toggleWire(); others().forEach(o => o.toggleWire(v)); btn?.classList.toggle('on', v); }
-    if (k === 'skel') { const v = viewer.toggleSkeleton(); others().forEach(o => o.toggleSkeleton(v)); btn?.classList.toggle('on', v); if (!v) toast('This model has no skeleton', { ms: 1600 }); }
+    if (k === 'skel') { const want = !viewer.showSkel; const v = viewer.toggleSkeleton(want); others().forEach(o => o.toggleSkeleton(v)); btn?.classList.toggle('on', v); if (want && !v) toast('This model has no skeleton', { ms: 1600 }); }
     if (k === 'bounds') { const v = viewer.toggleBounds(); others().forEach(o => o.toggleBounds(v)); btn?.classList.toggle('on', v); }
     if (k === 'grid') { const v = viewer.toggleGrid(); others().forEach(o => o.toggleGrid(v)); btn?.classList.toggle('on', v); }
     if (k === 'rotate') { const v = !viewer.controls.autoRotate; viewer.setAutoRotate(v); others().forEach(o => o.setAutoRotate(false)); btn?.classList.toggle('on', v); }

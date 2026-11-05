@@ -156,6 +156,7 @@ export class ModelViewer {
 
   async load(buf, path, opts) {
     const { root, clips, urls } = await loadModel(buf, path, opts);
+    (this._urls ? [...this._urls.values()] : []).forEach(u => URL.revokeObjectURL(u));
     this.setObject(root, clips);
     this._urls = urls;
     this.path = path;
@@ -247,6 +248,7 @@ export class ModelViewer {
     if (mode === 'matcap') over = new THREE.MeshMatcapMaterial({ matcap: this.matcap });
     if (mode === 'normals') over = new THREE.MeshNormalMaterial();
     if (mode === 'uv') over = new THREE.MeshBasicMaterial({ map: (this._checker ??= checkerTexture()) });
+    this._override?.dispose(); this._override = over;
     for (const m of this.meshes || []) {
       if (!over) { m.material = m.userData.orig; continue; }
       m.material = Array.isArray(m.userData.orig) ? m.userData.orig.map(() => over) : over;
@@ -274,7 +276,7 @@ export class ModelViewer {
   }
   toggleSkeleton(v = !this.showSkel) {
     this.showSkel = v;
-    if (this._skel) { this.scene.remove(this._skel); this._skel = null; }
+    if (this._skel) { this.scene.remove(this._skel); this._skel.dispose?.(); this._skel = null; }
     if (v && this.root) {
       this._skel = new THREE.SkeletonHelper(this.root);
       this._skel.material.linewidth = 2; this._skel.material.depthTest = false; this._skel.material.transparent = true;
@@ -431,6 +433,11 @@ export class ModelViewer {
     this.controls.dispose();
     if (this.root) disposeTree(this.root);
     (this._urls ? [...this._urls.values()] : []).forEach(u => URL.revokeObjectURL(u));
+    this._clearHelpers();
+    if (this.grid) { this.grid.geometry.dispose(); this.grid.material.dispose(); }
+    this.ground.geometry.dispose(); this.ground.material.dispose();
+    this.envTex?.dispose(); this.matcap?.dispose(); this._checker?.dispose(); this._override?.dispose();
+    this.key.shadow.map?.dispose();
     this.renderer.dispose();
     this.renderer.forceContextLoss?.();
     this.renderer.domElement.remove();
@@ -481,10 +488,11 @@ export async function renderThumb(buf, path, size = 320) {
   const cam = new THREE.PerspectiveCamera(35, 1, rad / 100, rad * 100);
   const dir = new THREE.Vector3(.85, .45, 1.2).normalize();
   cam.position.copy(c).addScaledVector(dir, rad / Math.sin(35 * Math.PI / 360) * 1.02); cam.lookAt(c);
-  r.setClearColor(0x000000, 0);
-  r.render(scene, cam);
-  const blob = await new Promise(res => r.domElement.toBlob(res, 'image/webp', .85));
-  disposeTree(root); urls.forEach(u => URL.revokeObjectURL(u));
-  return { blob, stats: { tris: countTris(root) } };
+  try {
+    r.setClearColor(0x000000, 0);
+    r.render(scene, cam);
+    const blob = await new Promise(res => r.domElement.toBlob(res, 'image/webp', .85));
+    return { blob, stats: { tris: countTris(root) } };
+  } finally { disposeTree(root); urls.forEach(u => URL.revokeObjectURL(u)); }
 }
 function countTris(root) { let t = 0; root.traverse(o => { if (o.isMesh) { const g = o.geometry; t += g.index ? g.index.count / 3 : g.attributes.position.count / 3; } }); return Math.round(t); }

@@ -1,10 +1,12 @@
 // Lazy thumbnails for gallery tiles. Models are rendered once and cached by git sha.
-import { getBlob, getThumb, putThumb, kindOf, mimeOf } from './files.js';
+import { getBlob, getThumb, putThumb, kindOf, imageUrl } from './files.js';
 
 const queue = [];
 let busy = 0, busyModels = 0;
 const MAX_MODEL_BYTES = 40 * 1024 * 1024;
 const urls = new Map(); // sha -> object URL (images + model thumbs)
+// forget the oldest thumbnails once we hold a lot of them (they reload from the browser cache)
+function trimUrls() { while (urls.size > 600) { const [k, u] = urls.entries().next().value; URL.revokeObjectURL(u); urls.delete(k); } }
 
 // The <img> starts hidden (display:none never intersects), so we watch its visible parent.
 const io = new IntersectionObserver(ents => {
@@ -51,8 +53,8 @@ async function make(img) {
   img.closest('.thumb')?.insertAdjacentHTML('beforeend', '<span class="spin"></span>');
   if (kind === 'image') {
     const buf = await getBlob(sha);
-    const u = URL.createObjectURL(new Blob([buf], { type: mimeOf(path) }));
-    urls.set(sha, u); return show(img, u);
+    const u = await imageUrl(buf, path);
+    urls.set(sha, u); trimUrls(); return show(img, u);
   }
   if (kind === 'model') {
     const cached = await getThumb(sha);

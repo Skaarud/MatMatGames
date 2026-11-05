@@ -244,6 +244,14 @@ function enableDrag(root, after) {
     } catch (er) { toastErr(er, 'Could not move the task'); after(); }
   };
   root.addEventListener('pointerdown', down);
+  // phones: a tap opens the card (dragging is mouse only; change the column inside the card)
+  let lastPointer = 'mouse';
+  root.addEventListener('pointerdown', e => { lastPointer = e.pointerType; }, true);
+  root.addEventListener('click', e => {
+    if (lastPointer !== 'touch') return;
+    const c = e.target.closest('.col .card');
+    if (c && !e.target.closest('a,button,input')) goTask(c.dataset.n);
+  });
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', up);
   return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
@@ -312,6 +320,6 @@ function ideaCard(t, v, parked = false) {
       <button class="btn sm vote ${v?.mine === 'down' ? 'mine' : ''}" data-vote="-1" data-n="${t.n}" title="${esc((v?.down || []).join(', ') || 'Vote down')}">👎 ${t.down}</button>
       <span class="faint" style="font-size:12px">${icon('chat')} ${t.comments}</span>
       <span style="flex:1"></span>
-      ${parked ? `<button class="btn sm" data-park="${t.n}" data-to="idea">Unpark</button>` : `<button class="btn sm ghost" data-park="${t.n}" data-to="parked">${icon('archive')} Park</button><button class="btn sm primary" data-promote="${t.n}">Make it a task</button>`}
+      ${parked ? `<button class="btn sm" data-park="${t.n}" data-to="${esc(t.meta.parkedFrom && t.meta.parkedFrom !== 'parked' ? t.meta.parkedFrom : 'idea')}">${t.meta.parkedFrom && !['idea', 'parked'].includes(t.meta.parkedFrom) ? 'Back to the board' : 'Unpark'}</button>` : `<button class="btn sm ghost" data-park="${t.n}" data-to="parked">${icon('archive')} Park</button><button class="btn sm primary" data-promote="${t.n}">Make it a task</button>`}
     </div></article>`;
 }

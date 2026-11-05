@@ -38,7 +38,7 @@ export function openTask(n, onClose) {
       <button class="btn ghost icon" data-close title="Close (Esc)">${icon('x')}</button>`;
     const people = t.assignees.map(a => S.person(a));
     const rev = t.reviewer ? S.person(t.reviewer) : null;
-    const fileTiles = t.files.map(p => { const e = S.tree?.entries.get(p); const k = kindOf(p); return `<div class="tile" data-file="${esc(p)}"><div class="thumb ${k === 'image' ? 'checker' : ''}">${e && (k === 'image' || k === 'model') ? `<img class="hidden" data-sha="${e.sha}" data-path="${esc(p)}" data-size="${e.size}" alt="">` : ''}<svg class="ph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">${icon(KIND_ICON[k]).replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg></div><div class="info"><div class="name">${esc(baseName(p))}</div><div class="sub">${e ? '' : '<span style="color:var(--danger)">missing</span>'}</div></div></div>`; }).join('');
+    const fileTiles = t.files.map(p => { const e = S.tree?.entries.get(p); const k = kindOf(p); return `<div class="tile" data-file="${esc(p)}"><div class="thumb ${k === 'image' ? 'checker' : ''}">${e && (k === 'image' || k === 'model') ? `<img class="hidden" data-sha="${e.sha}" data-path="${esc(p)}" data-size="${e.size}" alt="">` : ''}<svg class="ph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">${icon(KIND_ICON[k]).replace(/^<svg[^>]*>|<\/svg>$/g, '')}</svg></div><div class="info"><div class="name">${esc(baseName(p))}</div><div class="sub">${e ? '' : '<span style="color:var(--danger)">missing</span>'}</div></div><button class="btn sm icon unlink" data-unlink="${esc(p)}" title="Remove from this task (the file stays in the repo)">${icon('x')}</button></div>`; }).join('');
     const keepDesc = editingDesc ? body.querySelector('[data-desc-slot]')?.firstElementChild : null;
     const keepComposer = thread?.composer;
     const keepThread = body.querySelector('[data-thread]');
@@ -140,7 +140,9 @@ export function openTask(n, onClose) {
     }
     const dc = e.target.closest('[data-delcheck]');
     if (dc) { e.preventDefault(); const line = +dc.dataset.delcheck; return save(() => S.patchBody(n, ({ text }) => ({ text: text.split('\n').filter((_, i) => i !== line).join('\n') }))); }
-    const f = e.target.closest('[data-file]'); if (f) { location.hash = '#/file/' + encodeURIComponent(f.dataset.file); return; }
+    const un = e.target.closest('[data-unlink]');
+    if (un) { e.stopPropagation(); const fp = un.dataset.unlink; return save(() => S.patchBody(n, ({ meta }) => ({ meta: { ...meta, files: (meta.files || []).filter(x => x !== fp) } })), 'Removed from task'); }
+    const f = e.target.closest('[data-file]'); if (f) { location.hash = (kindOf(f.dataset.file) === 'model' ? '#/models/' : '#/file/') + encodeURIComponent(f.dataset.file); return; }
     if (e.target.closest('[data-deliver]')) return act('upload', { dir: `${S.cfg.hubDir}/tasks/${n}-${slug(t.title)}`, task: n });
     if (e.target.closest('[data-linkfile]')) return linkFile(n);
     const rv = e.target.closest('[data-review]');
