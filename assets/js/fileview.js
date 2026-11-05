@@ -8,7 +8,7 @@ import { uploadModal } from './upload.js';
 export async function render(main, route) {
   const path = route.arg;
   const entry = S.tree?.entries.get(path);
-  const page = el(`<div class="fileview"><section class="fv-stage"><div class="fv-top"></div><div class="fv-canvas"><div class="pane" data-pane="a"></div></div></section>
+  const page = el(`<div class="fileview viewer-host"><section class="fv-stage"><div class="fv-top"></div><div class="fv-canvas"><div class="pane" data-pane="a"></div></div></section>
     <aside class="fv-side"><div class="fv-tabs"></div><div class="fv-side-body"></div></aside></div>`);
   main.appendChild(page);
   main.style.overflow = 'hidden';
@@ -17,7 +17,7 @@ export async function render(main, route) {
   const kind = kindOf(path);
   const cleanups = [];
   let viewer = null, viewerB = null, unlink = null, pins = [], draft = null, pinMode = false, activePin = null;
-  let imgCtl = null;
+  let imgCtl = null, ctl = null;
   let tab = 'comments';
   let compareSha = null;
 
@@ -126,64 +126,13 @@ export async function render(main, route) {
 
   /* ---------- model ---------- */
   async function mountModel() {
-    const { ModelViewer, MODES, LIGHT_PRESETS } = await import('./viewer.js');
+    const { ModelViewer } = await import('./viewer.js');
     viewer = new ModelViewer(paneA);
     try { await viewer.load(buf, path, { resolve: rel => getFile(dirName(path) + '/' + rel).then(r => r.buf) }); }
     catch (e) { paneA.innerHTML = `<div class="empty" style="height:100%">${icon('cube')}<div>Could not read this model: ${esc(e.message)}</div></div>`; return; }
     paneA.appendChild(pinLayer);
-    const left = el(`<div class="vtools left">${MODES.map((m, i) => `<button class="btn icon ${m.key === 'lit' ? 'on' : ''}" data-mode="${m.key}" title="${m.label}: ${m.hint} (${i + 1})">${modeIcon(m.key)}</button>`).join('')}
-      <div class="sep"></div><button class="btn icon" data-t="wire" title="Wireframe overlay (W)">${icon('wire')}</button>
-      <button class="btn icon" data-t="skel" title="Show skeleton">${icon('bone')}</button>
-      <button class="btn icon" data-t="bounds" title="Bounding box">${icon('box')}</button>
-      <button class="btn icon on" data-t="grid" title="Grid">${icon('grid')}</button></div>`);
-    const tr = el(`<div class="vtools tr"><button class="btn icon" data-t="pin" title="Drop a comment pin (P)">${icon('pin')}</button>
-      <button class="btn icon" data-t="rotate" title="Turntable (R)">${icon('rotate')}</button>
-      <button class="btn icon" data-t="frame" title="Frame model (F)">${icon('focus')}</button>
-      <button class="btn icon" data-t="light" title="Lighting & background">${icon('sun')}</button>
-      <button class="btn icon" data-t="shot" title="Screenshot">${icon('camera')}</button>
-      <button class="btn icon" data-t="full" title="Fullscreen">${icon('expand')}</button></div>`);
-    paneA.append(left, tr);
-    if (viewer.clips.length) {
-      const ab = el(`<div class="vtools bottom anim-bar"><button class="btn icon" data-t="play" title="Play / pause (Space)">${icon('play')}</button>
-        <select class="select" data-clip style="height:30px;width:auto;max-width:180px">${viewer.clips.map((c, i) => `<option value="${i}">${esc(c.name || 'Clip ' + (i + 1))}</option>`).join('')}</select>
-        <input type="range" min="0" max="1000" value="0" data-scrub><span class="t" data-time>0.00s</span>
-        <select class="select" data-speed style="height:30px;width:70px"><option value=".25">¼×</option><option value=".5">½×</option><option value="1" selected>1×</option><option value="2">2×</option></select></div>`);
-      paneA.appendChild(ab);
-      const scrub = ab.querySelector('[data-scrub]'), tl = ab.querySelector('[data-time]'), pb = ab.querySelector('[data-t="play"]');
-      const sync = () => { const d = viewer.duration; if (d) { scrub.value = (viewer.time % d) / d * 1000; tl.textContent = `${(viewer.time % d).toFixed(2)} / ${d.toFixed(2)}s`; } pb.innerHTML = icon(viewer.playing ? 'pause' : 'play'); };
-      viewer.onFrame.add(sync);
-      ab.querySelector('[data-clip]').onchange = e => { viewer.play(+e.target.value, true); sync(); };
-      ab.querySelector('[data-speed]').onchange = e => viewer.speed = +e.target.value;
-      scrub.oninput = () => { if (viewer.playing) viewer.togglePlay(); viewer.setTime(scrub.value / 1000 * viewer.duration); sync(); };
-      pb.onclick = () => { viewer.togglePlay(); sync(); };
-      viewer.play(0, true); sync();
-    }
-    const toggle = (k, btn) => {
-      if (k === 'wire') btn.classList.toggle('on', viewer.toggleWire());
-      if (k === 'skel') { const v = viewer.toggleSkeleton(); btn.classList.toggle('on', v); if (!v) toast('This model has no skeleton', { ms: 1600 }); }
-      if (k === 'bounds') btn.classList.toggle('on', viewer.toggleBounds());
-      if (k === 'grid') btn.classList.toggle('on', viewer.toggleGrid());
-      if (k === 'rotate') { const v = !viewer.controls.autoRotate; viewer.setAutoRotate(v); viewerB?.setAutoRotate(false); btn.classList.toggle('on', v); }
-      if (k === 'frame') viewer.frame();
-      if (k === 'pin') setPinMode(!pinMode);
-      if (k === 'full') { const fs = page.querySelector('.fv-stage'); document.fullscreenElement ? document.exitFullscreen() : fs.requestFullscreen?.(); }
-      if (k === 'shot') viewer.screenshot().then(b => download(b, baseName(path).replace(/\.\w+$/, '') + '-' + viewer.mode + '.png'));
-      if (k === 'light') menu(btn, [
-        ...LIGHT_PRESETS.map(l => ({ label: l.label, value: 'l:' + l.key, icon: 'sun', checked: viewer.light === l.key })), 'sep',
-        ...[['theme', 'Theme background'], ['dark', 'Dark'], ['light', 'Light'], ['transparent', 'Transparent (for screenshots)']].map(([k2, l]) => ({ label: l, value: 'b:' + k2, checked: viewer.bg === k2 })), 'sep',
-        { label: 'Brighter', value: 'e:+', icon: 'plus' }, { label: 'Darker', value: 'e:-', icon: 'down' },
-      ], v => {
-        const [t, x] = v.split(':');
-        if (t === 'l') { viewer.setLight(x); viewerB?.setLight(x); }
-        if (t === 'b') { viewer.setBackground(x); viewerB?.setBackground(x); }
-        if (t === 'e') { const e2 = Math.max(.3, Math.min(3, (viewer.exposure ?? 1) * (x === '+' ? 1.2 : 1 / 1.2))); viewer.setExposure(e2); viewerB?.setExposure(e2); }
-      });
-    };
-    paneA.addEventListener('click', e => {
-      const m = e.target.closest('[data-mode]');
-      if (m) { viewer.setMode(m.dataset.mode); viewerB?.setMode(m.dataset.mode); left.querySelectorAll('[data-mode]').forEach(b => b.classList.toggle('on', b === m)); return; }
-      const t = e.target.closest('[data-t]'); if (t && t.dataset.t !== 'play') toggle(t.dataset.t, t);
-    });
+    const { mountControls } = await import('./controls.js');
+    ctl = mountControls(paneA, { viewer, others: () => viewerB ? [viewerB] : [], pin: () => setPinMode(!pinMode), fullscreenEl: page.querySelector('.fv-stage'), name: () => baseName(path) });
     // pin placement
     let downAt = null;
     viewer.renderer.domElement.addEventListener('pointerdown', e => downAt = [e.clientX, e.clientY]);
@@ -192,7 +141,7 @@ export async function render(main, route) {
       const hit = viewer.pick(e.clientX, e.clientY);
       if (!hit) return toast('Click on the model itself', { ms: 1400 });
       draft = { ...hit, view: viewer.getView() };
-      pinMode = false; paneA.querySelector('.pin-mode-hint')?.remove(); tr.querySelector('[data-t="pin"]').classList.remove('on');
+      pinMode = false; paneA.querySelector('.pin-mode-hint')?.remove(); ctl?.setPinOn(false);
       drawPins();
       tab = 'comments'; drawTabs(); drawSide();
       setTimeout(() => thread?.composer.focus(), 30);
@@ -207,29 +156,13 @@ export async function render(main, route) {
         if (occ) p.classList.toggle('behind', viewer.occluded(pt));
       });
     });
-    // viewer keys
-    const keys = e => {
-      if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable || e.ctrlKey || e.metaKey || document.querySelector('.modal, .drawer')) return;
-      const k = e.key.toLowerCase();
-      const btn = s => paneA.querySelector(s);
-      if (k === 'f') toggle('frame');
-      else if (k === 'w') toggle('wire', btn('[data-t="wire"]'));
-      else if (k === 'r') toggle('rotate', btn('[data-t="rotate"]'));
-      else if (k === 'p') toggle('pin', btn('[data-t="pin"]'));
-      else if (e.key === ' ') { e.preventDefault(); btn('[data-t="play"]')?.click(); }
-      else if ('12345'.includes(k)) btn(`[data-mode]:nth-child(${k})`)?.click();
-      else return;
-    };
-    document.addEventListener('keydown', keys);
-    cleanups.push(() => document.removeEventListener('keydown', keys), () => viewer.dispose(), () => viewerB?.dispose());
-    const onTheme = () => { viewer.applyTheme(); viewerB?.applyTheme(); };
-    window.addEventListener('themechange', onTheme); cleanups.push(() => window.removeEventListener('themechange', onTheme));
+    cleanups.push(() => ctl?.destroy(), () => viewer.dispose(), () => viewerB?.dispose());
   }
-  function modeIcon(k) { return { lit: icon('sun'), clay: icon('cube'), matcap: icon('sparkle'), normals: icon('layers'), uv: icon('grid') }[k]; }
 
   function setPinMode(v) {
     pinMode = v;
     paneA.querySelector('[data-t="pin"]')?.classList.toggle('on', v);
+    ctl?.setPinOn(v);
     paneA.querySelector('.pin-mode-hint')?.remove();
     if (v) paneA.appendChild(el(`<div class="pin-mode-hint">Click where your comment goes · Esc to cancel</div>`));
   }

@@ -24,7 +24,8 @@ This repo only holds the website. All the real stuff (tasks, comments, models, i
 
 - **Ctrl K** searches everything. **?** shows all shortcuts. **C** new task, **I** new idea, **U** upload.
 - Quick add on the board understands `Rig the troll #art !high @me due:fri`.
-- In the 3D viewer: **1–5** switch Lit / Clay / Matcap / Normals / UV checker, **W** wireframe, **R** turntable, **P** drop a comment pin, **Space** play/pause the animation.
+- **Models** (G M) shows every model in the repo on one shelf, grouped by category. Click one or use ← → to flip through them; the grid button shows them all as big tiles.
+- In the 3D viewer: **1–5** switch Lit / Clay / Matcap / Normals / UV checker, **W** wireframe, **B** skeleton, **L** lighting, **R** turntable, **P** drop a comment pin, **Space** play/pause the animation.
 - The hub checks for changes every 15 seconds while it's open, and shows a toast + Inbox badge when the other person comments, mentions you, assigns you, asks for review, uploads or pitches an idea. GitHub also emails you about comments.
 - Files over 100 MB can't go through GitHub; keep big Unreal assets in the game repo as usual.
 - Pick **Matrix** or **Ink** at the bottom of the sidebar.

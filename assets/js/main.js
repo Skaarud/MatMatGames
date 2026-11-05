@@ -61,6 +61,7 @@ const NAV = [
   { r: 'home', label: 'Home', icon: 'home', key: 'h' },
   { r: 'board', label: 'Board', icon: 'board', key: 'b' },
   { r: 'ideas', label: 'Ideas', icon: 'bulb', key: 'i' },
+  { r: 'models', label: 'Models', icon: 'cube', key: 'm' },
   { r: 'files', label: 'Files', icon: 'files', key: 'f' },
   { r: 'inbox', label: 'Inbox', icon: 'bell', key: 'n' },
 ];
@@ -132,8 +133,8 @@ export async function action(name, arg) {
 
 function showHelp() {
   import('./ui.js').then(({ modal }) => modal({ title: 'Keyboard shortcuts', body: `<div class="help-grid">
-    ${[['Ctrl K', 'Search everything, run any action'], ['C', 'New task'], ['I', 'New idea'], ['U', 'Upload files'], ['G then H / B / I / F / N', 'Go to Home, Board, Ideas, Files, Inbox'], ['/', 'Filter the current page'], ['T', 'Switch Matrix / Ink'], ['Esc', 'Close'], ['?', 'This help'],
-      ['', ''], ['In the 3D viewer', ''], ['F', 'Frame the model'], ['W', 'Wireframe'], ['1–5', 'Lit, clay, matcap, normals, UV'], ['R', 'Turntable'], ['P', 'Drop a comment pin'], ['Space', 'Play / pause animation'],
+    ${[['Ctrl K', 'Search everything, run any action'], ['C', 'New task'], ['I', 'New idea'], ['U', 'Upload files'], ['G then H / B / I / M / F / N', 'Go to Home, Board, Ideas, Models, Files, Inbox'], ['← →', 'Next / previous model (Models page)'], ['/', 'Filter the current page'], ['T', 'Switch Matrix / Ink'], ['Esc', 'Close'], ['?', 'This help'],
+      ['', ''], ['In the 3D viewer', ''], ['F', 'Frame the model'], ['W', 'Wireframe'], ['B', 'Skeleton'], ['L', 'Lighting'], ['1–5', 'Lit, clay, matcap, normals, UV'], ['R', 'Turntable'], ['P', 'Drop a comment pin'], ['Space', 'Play / pause animation'],
       ['', ''], ['In a task', ''], ['Ctrl Enter', 'Send comment'], ['Quick add', 'Fix troll rig #art !high @friend due:fri']].map(([k, v]) => k || v ? `<span>${k ? k.split(' ').map(x => x.length <= 6 && x !== 'then' && x !== 'In' ? `<span class="kbd">${x}</span>` : x).join(' ') : ''}</span><span class="${k ? 'muted' : ''}" style="${k ? '' : 'font-weight:700;margin-top:6px'}">${v}</span>` : '<span></span><span></span>').join('')}
   </div>` }));
 }
@@ -166,6 +167,7 @@ const VIEWS = {
   home: () => import('./home.js'),
   board: () => import('./board.js'),
   ideas: () => import('./board.js').then(m => ({ render: m.renderIdeas })),
+  models: () => import('./models.js'),
   files: () => import('./gallery.js'),
   file: () => import('./fileview.js'),
   inbox: () => import('./notices.js').then(m => ({ render: m.renderInbox })),
@@ -215,7 +217,7 @@ function keys(e) {
     return;
   }
   if (typing || e.ctrlKey || e.metaKey || e.altKey || hasModal()) return;
-  if (document.querySelector('.fileview') && 'fwr12345pP '.includes(e.key) && !gPending) return; // viewer owns these
+  if (document.querySelector('.viewer-host') && 'fwrblp12345 '.includes(e.key.toLowerCase()) && !gPending) return; // the 3D viewer owns these
   const k = e.key.toLowerCase();
   if (gPending) {
     gPending = 0;

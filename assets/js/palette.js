@@ -10,13 +10,13 @@ const ACTIONS = [
   { label: 'Go to Home', icon: 'home', k: 'G H', run: () => location.hash = '#/home' },
   { label: 'Go to Board', icon: 'board', k: 'G B', run: () => location.hash = '#/board' },
   { label: 'Go to Ideas', icon: 'bulb', k: 'G I', run: () => location.hash = '#/ideas' },
+  { label: 'Go to Models', icon: 'cube', k: 'G M', run: () => location.hash = '#/models' },
   { label: 'Go to Files', icon: 'files', k: 'G F', run: () => location.hash = '#/files' },
   { label: 'Go to Inbox', icon: 'bell', k: 'G N', run: () => location.hash = '#/inbox' },
   { label: 'Settings', icon: 'gear', run: () => location.hash = '#/settings' },
   { label: 'Switch theme (Matrix / Ink)', icon: 'sun', k: 'T', run: () => act('theme') },
   { label: 'Keyboard shortcuts', icon: 'keyboard', k: '?', run: () => act('help') },
   { label: 'My tasks', icon: 'user', run: () => { localStorage.setItem('mmg.boardFilter', JSON.stringify({ view: 'board', who: 'me' })); location.hash = '#/board?me'; } },
-  { label: 'Models only', icon: 'cube', run: () => { const o = JSON.parse(localStorage.getItem('mmg.galleryOpt') || '{}'); o.kind = 'model'; localStorage.setItem('mmg.galleryOpt', JSON.stringify(o)); location.hash = '#/files/'; } },
 ];
 
 function search(q, { filesOnly = false } = {}) {
@@ -38,7 +38,7 @@ function search(q, { filesOnly = false } = {}) {
       if (s > 0) fs.push({ e, s: s + (k === 'model' ? 5 : k === 'image' ? 3 : 0) });
     }
     fs.sort((a, b) => b.s - a.s);
-    if (fs.length) groups.push(['Files', fs.slice(0, 10).map(({ e }) => ({ label: e.path.split('/').pop(), sub: e.path.split('/').slice(0, -1).join('/'), icon: KIND_ICON[kindOf(e.path)], path: e.path, run: () => location.hash = '#/file/' + encodeURIComponent(e.path) }))]);
+    if (fs.length) groups.push(['Files', fs.slice(0, 10).map(({ e }) => ({ label: e.path.split('/').pop(), sub: e.path.split('/').slice(0, -1).join('/'), icon: KIND_ICON[kindOf(e.path)], path: e.path, run: () => location.hash = (kindOf(e.path) === 'model' ? '#/models/' : '#/file/') + encodeURIComponent(e.path) }))]);
   }
   return groups;
 }

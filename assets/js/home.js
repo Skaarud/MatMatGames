@@ -46,7 +46,7 @@ export function render(main) {
   page.addEventListener('click', e => {
     const a = e.target.closest('[data-a]'); if (a) { act(a.dataset.a); return; }
     const r = e.target.closest('[data-task]'); if (r) { location.hash = '#/task/' + r.dataset.task; return; }
-    const f = e.target.closest('[data-file]'); if (f) { location.hash = '#/file/' + encodeURIComponent(f.dataset.file); }
+    const f = e.target.closest('[data-file]'); if (f) { location.hash = (kindOf(f.dataset.file) === 'model' ? '#/models/' : '#/file/') + encodeURIComponent(f.dataset.file); }
   });
   Notices.bindFeed(page);
 
