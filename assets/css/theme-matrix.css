@@ -1,0 +1,52 @@
+/* Matrix: phosphor green on near-black, monospace, CRT glow, digital rain behind. */
+html[data-theme="matrix"] {
+  --bg: #010603; --bg2: #031208; --bg3: #062211; --bg-glass: rgba(2, 14, 6, .84);
+  --fg: #c9ffd6; --fg2: #6fdc8c; --fg3: #3a9a55;
+  --line: rgba(0, 255, 65, .16); --line2: rgba(0, 255, 65, .32);
+  --accent: #00ff41; --accent-fg: #001a07; --accent-soft: rgba(0, 255, 65, .11);
+  --danger: #ff3b3b; --warn: #e8ff3b; --ok: #00ff41;
+  --s-idea: #b6ff00; --s-todo: #5fbf7a; --s-doing: #00e5ff; --s-review: #e8ff3b; --s-done: #00ff41; --s-parked: #2f6e40;
+  --t-art: #ff5cd6; --t-code: #00e5ff; --t-design: #b6ff00; --t-bug: #ff3b3b; --t-audio: #ffe14d; --t-level: #00ff9c; --t-writing: #ffa64d;
+  --radius: 3px; --radius-sm: 2px; --radius-lg: 4px;
+  --font-body: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-head: var(--font-body);
+  --shadow: 0 0 0 1px rgba(0,255,65,.15), 0 14px 40px rgba(0,0,0,.7), 0 0 30px rgba(0,255,65,.08);
+  --shadow-sm: 0 0 12px rgba(0,255,65,.14);
+  --glow: 0 0 12px rgba(0,255,65,.55);
+  --viewer-bg: #000804; --viewer-grid: #0a3d1a;
+  color-scheme: dark;
+}
+html[data-theme="matrix"] body { font-size: 13px; }
+html[data-theme="matrix"] h1, html[data-theme="matrix"] .brand-name, html[data-theme="matrix"] .hello {
+  color: var(--accent); text-shadow: 0 0 10px rgba(0,255,65,.6), 0 0 2px rgba(0,255,65,.9); letter-spacing: .02em;
+}
+html[data-theme="matrix"] .page-head h1::before { content: "> "; opacity: .6; }
+html[data-theme="matrix"] .page-head h1::after { content: "_"; animation: blink 1.05s steps(1) infinite; margin-left: 2px; }
+@keyframes blink { 50% { opacity: 0; } }
+html[data-theme="matrix"] #scan {
+  background: repeating-linear-gradient(to bottom, rgba(0,0,0,0) 0 2px, rgba(0,0,0,.22) 2px 3px);
+  mix-blend-mode: multiply;
+}
+html[data-theme="matrix"] #scan::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.55) 100%);
+}
+html[data-theme="matrix"] #fx { opacity: .55; }
+html[data-theme="matrix"] .card, html[data-theme="matrix"] .tile, html[data-theme="matrix"] .stat { background: rgba(3, 22, 10, .92); }
+html[data-theme="matrix"] .card:hover, html[data-theme="matrix"] .tile:hover { box-shadow: 0 0 0 1px var(--accent), 0 0 18px rgba(0,255,65,.25); }
+html[data-theme="matrix"] .nav a.active { box-shadow: inset 2px 0 0 var(--accent); text-shadow: 0 0 8px rgba(0,255,65,.6); }
+html[data-theme="matrix"] .input:focus, html[data-theme="matrix"] .textarea:focus { caret-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 14px rgba(0,255,65,.25); }
+html[data-theme="matrix"] .chip { border-radius: 2px; text-transform: lowercase; }
+html[data-theme="matrix"] .col-head h3::before { content: "[ "; color: var(--fg3); }
+html[data-theme="matrix"] .col-head h3::after { content: " ]"; color: var(--fg3); }
+html[data-theme="matrix"] .btn.primary { text-transform: uppercase; letter-spacing: .08em; font-size: 12px; }
+html[data-theme="matrix"] .t-title { color: var(--accent); text-shadow: 0 0 8px rgba(0,255,65,.4); }
+html[data-theme="matrix"] .avatar { filter: grayscale(1) sepia(1) hue-rotate(70deg) saturate(3) brightness(.9); }
+html[data-theme="matrix"] .tile .thumb img.photo { filter: none; }
+html[data-theme="matrix"] .pin { border-radius: 2px; box-shadow: 0 0 12px rgba(0,255,65,.8); }
+html[data-theme="matrix"] .boot {
+  position: fixed; inset: 0; z-index: 200; background: #000; display: grid; place-items: center;
+  font: 600 22px var(--font-mono); color: var(--accent); text-shadow: var(--glow); pointer-events: none;
+  animation: bootout .6s 2.6s forwards;
+}
+@keyframes bootout { to { opacity: 0; visibility: hidden; } }

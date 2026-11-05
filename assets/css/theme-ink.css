@@ -1,0 +1,43 @@
+/* Ink: warm paper, black ink, soft edges, slow living ink in the background. */
+html[data-theme="ink"] {
+  --bg: #efe9dd; --bg2: #f7f3ea; --bg3: #ece5d6; --bg-glass: rgba(249, 245, 236, .82);
+  --fg: #16130f; --fg2: #5a5349; --fg3: #8d8576;
+  --line: rgba(22, 19, 15, .12); --line2: rgba(22, 19, 15, .22);
+  --accent: #16130f; --accent-fg: #f7f3ea; --accent-soft: rgba(22, 19, 15, .07);
+  --danger: #a3271b; --warn: #b9741a; --ok: #2f6b3a;
+  --s-idea: #6d4c9a; --s-todo: #6b665c; --s-doing: #1f5f8b; --s-review: #b9741a; --s-done: #2f6b3a; --s-parked: #a39b8c;
+  --t-art: #a8326e; --t-code: #1f5f8b; --t-design: #6d4c9a; --t-bug: #a3271b; --t-audio: #9a7a12; --t-level: #2f6b3a; --t-writing: #b0581e;
+  --radius: 14px; --radius-sm: 9px; --radius-lg: 22px;
+  --font-body: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-head: Fraunces, "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 20px 50px -18px rgba(40, 30, 15, .35), 0 2px 6px rgba(40,30,15,.08);
+  --shadow-sm: 0 6px 16px -8px rgba(40, 30, 15, .35);
+  --glow: none;
+  --viewer-bg: #e8e1d2; --viewer-grid: #cfc5b2;
+  color-scheme: light;
+}
+html[data-theme="ink"] body {
+  background:
+    radial-gradient(1200px 800px at 10% -10%, rgba(255,255,255,.7), transparent 60%),
+    radial-gradient(900px 700px at 110% 110%, rgba(150,120,80,.12), transparent 60%),
+    var(--bg);
+}
+html[data-theme="ink"] #scan {
+  opacity: .5; mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .45  0 0 0 0 .38  0 0 0 0 .28  0 0 0 .22 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+html[data-theme="ink"] h1, html[data-theme="ink"] .hello, html[data-theme="ink"] .t-title { font-weight: 600; letter-spacing: -.015em; }
+html[data-theme="ink"] .brand-name { font-weight: 800; }
+html[data-theme="ink"] .page-head h1 { font-size: 32px; }
+html[data-theme="ink"] .side { background: rgba(244, 239, 228, .7); }
+html[data-theme="ink"] .card, html[data-theme="ink"] .tile, html[data-theme="ink"] .stat { background: #fbf8f2; box-shadow: 0 1px 2px rgba(40,30,15,.06); }
+html[data-theme="ink"] .card:hover, html[data-theme="ink"] .tile:hover { box-shadow: var(--shadow-sm); }
+html[data-theme="ink"] .col { background: rgba(236, 229, 214, .55); border-color: transparent; }
+html[data-theme="ink"] .btn.primary { border-radius: 999px; padding: 0 16px; }
+html[data-theme="ink"] .nav a.active { background: var(--fg); color: var(--bg2); }
+html[data-theme="ink"] .theme-switch button.on { border-radius: 999px; }
+html[data-theme="ink"] .chip { font-weight: 600; }
+html[data-theme="ink"] .col-head h3 { font-family: var(--font-head); text-transform: none; letter-spacing: 0; font-size: 16px; font-weight: 600; }
+html[data-theme="ink"] .pin { background: #16130f; color: #f7f3ea; border-radius: 50% 50% 50% 4px; }
+html[data-theme="ink"] .scrim, html[data-theme="ink"] .modal-scrim { background: rgba(40, 30, 15, .25); backdrop-filter: blur(2px); }
+html[data-theme="ink"] .nav a .count.hot { background: var(--danger); }
