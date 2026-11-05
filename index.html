@@ -2,6 +2,7 @@
 <html lang="en" data-theme="matrix">
 <head>
 <meta charset="utf-8">
+<meta name="hub-version" content="20261105124518">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>MatMat Games Hub</title>
 <meta name="description" content="The MatMat Games studio hub: tasks, ideas, models and reviews.">
@@ -13,14 +14,35 @@
   // Apply the saved theme before first paint so there is no flash.
   try { const t = localStorage.getItem('mmg.theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
 </script>
-<link rel="stylesheet" href="assets/css/app.css">
-<link rel="stylesheet" href="assets/css/theme-matrix.css">
-<link rel="stylesheet" href="assets/css/theme-ink.css">
+<link rel="stylesheet" href="assets/css/app.css?v=20261105124518">
+<link rel="stylesheet" href="assets/css/theme-matrix.css?v=20261105124518">
+<link rel="stylesheet" href="assets/css/theme-ink.css?v=20261105124518">
 <script type="importmap">
-{ "imports": {
+{
+ "imports": {
   "three": "./vendor/three/build/three.module.min.js",
-  "three/addons/": "./vendor/three/addons/"
-} }
+  "three/addons/": "./vendor/three/addons/",
+  "./assets/js/board.js": "./assets/js/board.js?v=20261105124518",
+  "./assets/js/comments.js": "./assets/js/comments.js?v=20261105124518",
+  "./assets/js/files.js": "./assets/js/files.js?v=20261105124518",
+  "./assets/js/fileview.js": "./assets/js/fileview.js?v=20261105124518",
+  "./assets/js/fx.js": "./assets/js/fx.js?v=20261105124518",
+  "./assets/js/gallery.js": "./assets/js/gallery.js?v=20261105124518",
+  "./assets/js/gh.js": "./assets/js/gh.js?v=20261105124518",
+  "./assets/js/home.js": "./assets/js/home.js?v=20261105124518",
+  "./assets/js/main.js": "./assets/js/main.js?v=20261105124518",
+  "./assets/js/md.js": "./assets/js/md.js?v=20261105124518",
+  "./assets/js/notices.js": "./assets/js/notices.js?v=20261105124518",
+  "./assets/js/palette.js": "./assets/js/palette.js?v=20261105124518",
+  "./assets/js/settings.js": "./assets/js/settings.js?v=20261105124518",
+  "./assets/js/store.js": "./assets/js/store.js?v=20261105124518",
+  "./assets/js/task.js": "./assets/js/task.js?v=20261105124518",
+  "./assets/js/thumbs.js": "./assets/js/thumbs.js?v=20261105124518",
+  "./assets/js/ui.js": "./assets/js/ui.js?v=20261105124518",
+  "./assets/js/upload.js": "./assets/js/upload.js?v=20261105124518",
+  "./assets/js/viewer.js": "./assets/js/viewer.js?v=20261105124518"
+ }
+}
 </script>
 </head>
 <body>
@@ -31,6 +53,6 @@
 <div id="modal-root"></div>
 <div id="toasts" role="status" aria-live="polite"></div>
 <noscript>This hub needs JavaScript.</noscript>
-<script type="module" src="assets/js/main.js"></script>
+<script type="module" src="./assets/js/main.js?v=20261105124518"></script>
 </body>
 </html>

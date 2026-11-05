@@ -245,7 +245,28 @@ async function enter() {
   route();
 }
 
+/* ---------------- new version check ---------------- */
+function watchVersion() {
+  const mine = document.querySelector('meta[name="hub-version"]')?.content;
+  if (!mine) return;
+  let told = false;
+  const check = async () => {
+    if (told || document.hidden) return;
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      const { version } = await r.json();
+      if (version && version !== mine) {
+        told = true;
+        toast('A new version of the hub is out', { sub: 'Click here to reload and get it.', ms: 600000, onClick: () => location.reload() });
+      }
+    } catch {}
+  };
+  setInterval(check, 90000);
+  document.addEventListener('visibilitychange', check);
+}
+
 async function boot() {
+  watchVersion();
   startFx(themeNow());
   window.addEventListener('hashchange', route);
   document.addEventListener('keydown', keys);
